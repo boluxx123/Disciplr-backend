@@ -1,41 +1,11 @@
 // Data store for the deployed Disciplr API.
 // - If DATABASE_URL is set, uses Postgres (the real `vaults` / `milestones` tables created by
-//   `npm run migrate:latest`, plus an `activity_log` table created on first use).
+//   `npm run migrate:latest`, and `activity_log`, all owned by migrations).
 // - Explicit memory mode or non-production without a URL uses demo memory.
 // - Postgres failures and production without a URL fail closed.
-import { randomUUID, randomBytes } from 'node:crypto'
 import { createStoreProvider } from './store-bootstrap.mjs'
-
-const DAY = 86400000
+import { seed } from './demo-data.mjs'
 const iso = (d) => new Date(d).toISOString()
-const hex = (n) => randomBytes(n).toString('hex')
-
-function seed() {
-  const now = Date.now()
-  const mk = (id, name, creator, amount, status, startOff, endOff, ms) => ({
-    id, name, creator, amount: String(amount), status,
-    startDate: iso(now + startOff * DAY), endDate: iso(now + endOff * DAY),
-    verifier: 'GDLYZ73G3GEF36HBLEBFXOXAP5IXJDRQCRG47JCKR4XAXNOFCU44NZT2',
-    successDestination: creator, failureDestination: 'GCAJ2QOEXTR7AB5PJXSAO2HEISE2VEIUIX7CP3F3MOYVX7GMADB7KX22',
-    createdAt: iso(now + startOff * DAY), updatedAt: iso(now + startOff * DAY),
-    milestones: ms.map((m, i) => ({ id: `${id}-m${i + 1}`, title: m[0], amount: String(m[1]), dueDate: iso(now + m[2] * DAY), status: m[3] })),
-  })
-  const creator = 'GBVAQKGA5P4TIZSZJBS5AW3XNJOTYG6I3Y5CLIGCBBUZDHMVF7YE7XCQ'
-  const vaults = [
-    mk('vault-demo-001', 'Launch the MVP', creator, 2500, 'active', -20, 40, [['Ship MVP', 1000, 10, 'completed'], ['Reach 100 users', 1000, 25, 'pending'], ['Public launch', 500, 40, 'pending']]),
-    mk('vault-demo-002', 'Finish the thesis', creator, 800, 'completed', -60, -5, [['Finish thesis draft', 400, -30, 'completed'], ['Submit thesis', 400, -5, 'completed']]),
-    mk('vault-demo-003', 'Run 3x per week', creator, 1200, 'failed', -90, -10, [['Run 3x per week for 8 weeks', 1200, -10, 'failed']]),
-  ]
-  const activity = [
-    { id: randomUUID(), type: 'create', vaultId: 'vault-demo-001', amount: '2500', status: 'confirmed', hash: hex(32), memo: 'Vault created', createdAt: vaults[0].createdAt },
-    { id: randomUUID(), type: 'validate', vaultId: 'vault-demo-001', amount: '1000', status: 'confirmed', hash: hex(32), memo: 'Milestone validated: Ship MVP', createdAt: iso(now - 8 * DAY) },
-    { id: randomUUID(), type: 'create', vaultId: 'vault-demo-002', amount: '800', status: 'confirmed', hash: hex(32), memo: 'Vault created', createdAt: vaults[1].createdAt },
-    { id: randomUUID(), type: 'release', vaultId: 'vault-demo-002', amount: '800', status: 'confirmed', hash: hex(32), memo: 'Funds released to success destination', createdAt: iso(now - 5 * DAY) },
-    { id: randomUUID(), type: 'create', vaultId: 'vault-demo-003', amount: '1200', status: 'confirmed', hash: hex(32), memo: 'Vault created', createdAt: vaults[2].createdAt },
-    { id: randomUUID(), type: 'redirect', vaultId: 'vault-demo-003', amount: '1200', status: 'confirmed', hash: hex(32), memo: 'Funds redirected to failure destination', createdAt: iso(now - 10 * DAY) },
-  ]
-  return { vaults, activity }
-}
 
 export class MemoryStore {
   kind = 'memory'
@@ -58,22 +28,9 @@ export class PgStore {
   kind = 'postgres'
   constructor(pool) { this.pool = pool }
   async init() {
-    await this.pool.query(`CREATE TABLE IF NOT EXISTS activity_log (
-      id uuid PRIMARY KEY, type text NOT NULL, vault_id text NOT NULL, amount numeric(36,7) NOT NULL DEFAULT 0,
-      status text NOT NULL DEFAULT 'confirmed', hash text NOT NULL, memo text, created_at timestamptz NOT NULL DEFAULT now())`)
-    await this.pool.query('ALTER TABLE vaults ADD COLUMN IF NOT EXISTS name varchar(200)')
-    for (const v of seed().vaults) {
-      await this.pool.query('UPDATE vaults SET name=$2 WHERE id=$1 AND name IS NULL', [v.id, v.name])
-      await this.pool.query('UPDATE vaults SET creator=$2, verifier=$3, success_destination=$4, failure_destination=$5 WHERE id=$1 AND creator<>$2',
-        [v.id, v.creator, v.verifier, v.successDestination, v.failureDestination])
-    }
-    const { rows } = await this.pool.query('SELECT count(*)::int AS n FROM vaults')
-    if (rows[0].n === 0) {
-      const s = seed()
-      for (const v of s.vaults) await this.createVault(v)
-      for (const a of s.activity) await this.addActivity(a)
-    }
+    await this.pool.query('SELECT 1')
   }
+
   rowToVault(r, ms) {
     return {
       id: r.id, name: r.name || `Vault ${r.id}`, creator: r.creator, amount: String(Number(r.amount)), status: r.status, startDate: iso(r.start_date), endDate: iso(r.end_date),

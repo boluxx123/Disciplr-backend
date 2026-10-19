@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "dev": "node api.js && tsx watch src/index.ts",
+    "build": "node api.js && tsc",
+    "start": "node api.js && node dist/index.js",
     "lint": "eslint src --ext .ts",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit --testTimeout=30000",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
@@ -24,7 +24,8 @@
     "openapi:typecheck": "tsc --noEmit -p tsconfig.docs.json",
     "openapi:lint": "redocly lint docs/openapi.yaml",
     "openapi:validate": "redocly stats docs/openapi.yaml",
-    "openapi:check": "tsx src/docs/generate-spec.ts --check"
+    "openapi:check": "tsx src/docs/generate-spec.ts --check",
+    "seed:demo": "node scripts/seed-demo.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1058.0",

@@ -52,9 +52,10 @@ npm install
 cp .env.example .env            # if present; set DATABASE_URL=postgres://...
 npm run migrate:latest          # applies the Knex migrations in db/migrations
 node api/index.mjs              # serves http://localhost:3001 (PORT to override)
+npm run seed:demo               # optional: explicitly insert demo fixtures
 ```
 
-Without `DATABASE_URL`, non-production uses an in-memory demo store (data resets on restart or cold start); production fails closed. `STORE_MODE=memory` explicitly opts into demo mode. With a database URL, connection failures return 503 with `Retry-After` and later requests retry; they never switch to demo memory. The real `vaults` and `milestones` tables are used and `activity_log` is created on first request. The first request seeds three demo vaults into an empty database.
+Without `DATABASE_URL`, non-production uses an in-memory demo store (data resets on restart or cold start); production fails closed. `STORE_MODE=memory` explicitly opts into demo mode. With a database URL, connection failures return 503 with `Retry-After` and later requests retry; they never switch to demo memory. The real `vaults`, `milestones` and `activity_log` tables are owned by migrations. Store initialization only checks connectivity and never seeds or rewrites rows. Run `npm run seed:demo` explicitly to insert demo fixtures; repeated runs preserve existing vaults and their children. Production seeding refuses to run unless `--force` is passed (`npm run seed:demo -- --force`).
 
 Full service (optional): `npm run dev` (needs the variables documented in `docs/configuration.md`). Tests: `npm test`. OpenAPI for the full service: `npm run openapi:generate`.
 
@@ -77,6 +78,8 @@ vercel --prod --yes
 ```
 
 Migrations are run against the database with `DATABASE_URL=<unpooled url> npm run migrate:latest`. A previous migration indexed `vaults.org_id`, a column that does not exist; that index now lives in `20260425140000_add_organization_id_to_vaults.cjs` on `organization_id`, and all 75 migrations apply cleanly on a fresh Postgres.
+
+Run migrations before deploying this API version. The activity-log migration upgrades the old runtime-created table, checks legacy rows before adding constraints, and reports violation counts without changing those rows. Remediate reported rows before retrying. Demo seeding is optional and never part of startup or deployment.
 
 ## Limitations
 
