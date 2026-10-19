@@ -1,0 +1,18 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "main",
+    "origin",
+    "security/issue-1720-auth-bind-step-up-sessions-to-a-verified"
+  ],
+  "parent": {
+    "main": null,
+    "origin": "main",
+    "security/issue-1720-auth-bind-step-up-sessions-to-a-verified": "main"
+  },
+  "order": [
+    "main",
+    "origin",
+    "security/issue-1720-auth-bind-step-up-sessions-to-a-verified"
+  ]
+}
